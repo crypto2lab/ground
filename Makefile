@@ -1,5 +1,5 @@
 tinygo-runtime-build:
-	tinygo build -o ./target/runtime.wasm -target wasm ./cmd/runtime/...
+	tinygo build -o ./target/runtime.wasm -scheduler=none --no-debug -target=wasi ./cmd/runtime/...
 
 run: tinygo-runtime-build
 	go run ./cmd/client/... ./target/runtime.wasm
