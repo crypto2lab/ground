@@ -37,6 +37,7 @@ func main() {
 	}
 
 	greet := mod.ExportedFunction("greet")
+	greeting := mod.ExportedFunction("greeting")
 	malloc := mod.ExportedFunction("malloc")
 	free := mod.ExportedFunction("free")
 
@@ -60,6 +61,23 @@ func main() {
 	if err != nil {
 		log.Fatalf("while calling greet: %s", err)
 	}
+
+	results, err := greeting.Call(ctx, namePtr, nameSize)
+	if err != nil {
+		log.Fatalf("while calling greeting: %s", err)
+	}
+
+	encodedPtrData := results[0]
+	ptr := uint32(encodedPtrData >> 32)
+	size := uint32(encodedPtrData)
+
+	bytes, ok := mod.Memory().Read(ptr, size)
+	if !ok {
+		log.Fatalf("Memory.Read(%d, %d) out of range of memory size %d",
+			ptr, size, mod.Memory().Size())
+	}
+
+	fmt.Println("go >>", string(bytes))
 }
 
 func logString(_ context.Context, m api.Module, offset, byteCount uint32) {

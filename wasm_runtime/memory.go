@@ -1,3 +1,5 @@
+//go:build wasm
+
 package wasm_runtime
 
 import (

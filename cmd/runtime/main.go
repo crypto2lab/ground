@@ -1,3 +1,5 @@
+//go:build wasm
+
 package main
 
 import (
@@ -25,4 +27,13 @@ func greet(name string) {
 func _greet(ptr, size uint32) {
 	name := wasm_runtime.Ptr2String(ptr, size)
 	greet(name)
+}
+
+//export greeting
+func _greeting(ptr, size uint32) (ptrSize uint64) {
+	name := wasm_runtime.Ptr2String(ptr, size)
+	g := fmt.Sprintf("Hello, %s!", name)
+
+	ptr, size = wasm_runtime.String2Ptr(g)
+	return (uint64(ptr) << uint64(32)) | uint64(size)
 }
