@@ -1,6 +1,6 @@
 //go:build wasm
 
-package wasm_runtime
+package memory
 
 import (
 	"reflect"
