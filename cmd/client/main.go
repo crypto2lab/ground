@@ -1,85 +1,18 @@
 package main
 
 import (
-	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"log"
 	"os"
+	"os/signal"
+	"syscall"
 
-	"github.com/OneOfOne/xxhash"
 	"github.com/crypto2lab/ground/internal/chainspec"
-	"github.com/crypto2lab/ground/internal/primitives"
 )
 
 const defaultBadgerLocation = "./tmp"
-
-func startClient(chainspecFilePath string) error {
-	spec := chainspec.ChainSpec{}
-	chainSpecBytes, err := os.ReadFile(chainspecFilePath)
-	if err != nil {
-		return fmt.Errorf("while reading chainspec: %w", err)
-	}
-
-	err = json.Unmarshal(chainSpecBytes, &spec)
-	if err != nil {
-		return fmt.Errorf("while unmarshaling chainspec: %w", err)
-	}
-
-	database := NewDatabase()
-	err = database.Open()
-	if err != nil {
-		return fmt.Errorf("while opening database: %w", err)
-	}
-	defer database.Close()
-
-	err = spec.StoreGenesis(database)
-	if err != nil {
-		return fmt.Errorf("while storing genesis: %w", err)
-	}
-
-	retrieveAliceTNTBalance(database)
-	return nil
-}
-
-func retrieveAliceTNTBalance(db *Database) {
-	pubKey := primitives.PublicAddress("5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY")
-	encPubKey, err := pubKey.Encode()
-	if err != nil {
-		log.Fatal(err)
-		return
-	}
-
-	currency := primitives.Currency("TNT")
-	encCurrency, err := currency.Encode()
-	if err != nil {
-		log.Fatal(err)
-		return
-	}
-
-	//mod::module::publickey::currency
-	storageKey := fmt.Sprintf("mod::%s::%s::%s",
-		"ACCOUNT::", encPubKey, encCurrency)
-
-	hasher := xxhash.NewS64(0)
-	hasher.WriteString(storageKey)
-
-	result := hasher.Sum64()
-	aliceAccountKey := make([]byte, 8)
-	binary.LittleEndian.PutUint64(aliceAccountKey, result)
-
-	value, err := db.Get(aliceAccountKey)
-	if err != nil {
-		log.Fatal(err)
-		return
-	}
-
-	var expected uint64 = 1000000000000
-	got := binary.LittleEndian.Uint64(value)
-
-	fmt.Printf("expected=%v, got=%v\n", expected, got)
-}
 
 func importRuntimeToChainSpec(runtimeFilePath string, output string) error {
 	runtimePath := os.Args[1]
@@ -94,7 +27,7 @@ func importRuntimeToChainSpec(runtimeFilePath string, output string) error {
 
 	genericChainSpec := chainspec.ChainSpec{
 		Genesis: &chainspec.Genesis{
-			Runtime: wasmHexBlob,
+			Code: wasmHexBlob,
 			Accounts: []*chainspec.ChainSpecAccount{
 				{
 					PublicAddress: "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY",
@@ -131,7 +64,18 @@ func main() {
 		log.Fatalf("importing runtime to chainspec: %s", err)
 	}
 
-	startClient(testNetChainSpec)
+	client, err := StartClient(testNetChainSpec)
+	if err != nil {
+		log.Fatalf("starting client: %s", err)
+	}
+
+	shutdownSig := make(chan os.Signal, 1)
+	signal.Notify(shutdownSig, syscall.SIGINT, syscall.SIGTERM)
+
+	<-shutdownSig
+
+	client.Stop()
+	log.Printf("client sucessfully shutdown!\n")
 }
 
 // func main() {
