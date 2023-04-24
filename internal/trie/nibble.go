@@ -1,5 +1,7 @@
 package trie
 
+import "github.com/crypto2lab/ground/lib/comparable"
+
 func NibblesToKey(nibbles []byte) []byte {
 	if len(nibbles)%2 == 0 {
 		key := make([]byte, len(nibbles)/2)
@@ -34,4 +36,17 @@ func KeyToNibbles(key []byte) []byte {
 	}
 
 	return nibbles
+}
+
+func nibblesEqualsUntil(nibblesA, nibblesB []byte) int {
+	maxIterations := comparable.Min(len(nibblesA), len(nibblesB))
+	for idx := 0; idx < maxIterations; idx++ {
+		if nibblesA[idx] == nibblesB[idx] {
+			continue
+		}
+
+		return idx
+	}
+
+	return maxIterations
 }

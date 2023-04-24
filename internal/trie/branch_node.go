@@ -1,14 +1,16 @@
 package trie
 
+import (
+	"errors"
+)
+
 type BranchNode struct {
 	Path     []byte
 	Value    []byte
 	Children [16]Node
 }
 
-func (b *BranchNode) Insert(pathNibbles, value []byte) error {
-	return nil
-}
+var ErrChildrenNotFound = errors.New("children not found")
 
 func (b *BranchNode) SetBranch(branchNibble byte, node Node) {
 	b.Children[branchNibble] = node

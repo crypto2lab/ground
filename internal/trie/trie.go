@@ -1,8 +1,6 @@
 package trie
 
-import (
-	"github.com/crypto2lab/ground/lib/comparable"
-)
+import "fmt"
 
 type NodeType byte
 
@@ -27,61 +25,77 @@ func (t *Trie) Insert(key, value []byte) error {
 		return nil
 	}
 
-	switch node := t.root.(type) {
-	case *BranchNode:
-		return node.Insert(keyNibbles, value)
+	node := &t.root
+	for {
 
-	case *LeafNode:
-		matched := nibblesEqualsUntil(node.Path, keyNibbles)
-		if matched == len(keyNibbles) && matched == len(node.Path) {
-			t.root = NewLeafNode(node.Path, value)
-			return nil
-		}
+		if branch, ok := (*node).(*BranchNode); ok {
+			if len(keyNibbles) == 0 {
+				branch.Value = make([]byte, len(value))
+				copy(branch.Value, value[:])
+				return nil
+			}
 
-		if matched == len(node.Path) {
-			branchNode := NewBranchNodeWithValue(node.Path, node.Value)
-			branchNode.SetBranch(keyNibbles[matched], NewLeafNode(keyNibbles[matched+1:], value))
-			t.root = branchNode
-			return nil
-		}
+			matched := nibblesEqualsUntil(branch.Path, keyNibbles)
+			if matched < len(branch.Path) {
+				return fmt.Errorf("invalid path, expected min match: %d, got: %d",
+					len(branch.Path), matched)
+			}
 
-		if matched == len(keyNibbles) {
-			branchNode := NewBranchNodeWithValue(keyNibbles, value)
-			branchNode.SetBranch(node.Path[matched], NewLeafNode(node.Path[matched+1:], node.Value))
-			t.root = branchNode
-			return nil
-		}
+			if matched == len(branch.Path) {
+				branch.Value = make([]byte, len(value))
+				copy(branch.Value, value[:])
+				return nil
+			}
 
-		branchNodePath := make([]byte, matched)
-		copy(branchNodePath, node.Path[:matched])
-		branchNode := NewBranchNode(branchNodePath)
+			forkNibble, remaining := keyNibbles[matched], keyNibbles[matched+1:]
+			child := branch.Children[forkNibble]
+			if child == nil {
+				return fmt.Errorf("%w: nil child at %d", ErrChildrenNotFound, forkNibble)
+			}
 
-		newLeafNodePath := make([]byte, len(node.Path[matched+1:]))
-		copy(newLeafNodePath, node.Path[matched+1:])
-
-		branchNode.SetBranch(
-			node.Path[matched], NewLeafNode(newLeafNodePath, node.Value))
-
-		branchNode.SetBranch(
-			keyNibbles[matched], NewLeafNode(keyNibbles[matched+1:], value))
-
-		t.root = branchNode
-	}
-
-	return nil
-}
-
-func nibblesEqualsUntil(nibblesA, nibblesB []byte) int {
-	maxIterations := comparable.Min(len(nibblesA), len(nibblesB))
-	for idx := 0; idx < maxIterations; idx++ {
-		if nibblesA[idx] == nibblesB[idx] {
+			keyNibbles = remaining
+			node = &child
 			continue
 		}
 
-		return idx
-	}
+		if leaf, ok := (*node).(*LeafNode); ok {
+			matched := nibblesEqualsUntil(leaf.Path, keyNibbles)
+			if matched == len(keyNibbles) && matched == len(leaf.Path) {
+				t.root = NewLeafNode(leaf.Path, value)
+				return nil
+			}
 
-	return maxIterations
+			if matched == len(leaf.Path) {
+				branchNode := NewBranchNodeWithValue(leaf.Path, leaf.Value)
+				branchNode.SetBranch(keyNibbles[matched], NewLeafNode(keyNibbles[matched+1:], value))
+				t.root = branchNode
+				return nil
+			}
+
+			if matched == len(keyNibbles) {
+				branchNode := NewBranchNodeWithValue(keyNibbles, value)
+				branchNode.SetBranch(leaf.Path[matched], NewLeafNode(leaf.Path[matched+1:], leaf.Value))
+				t.root = branchNode
+				return nil
+			}
+
+			branchNodePath := make([]byte, matched)
+			copy(branchNodePath, leaf.Path[:matched])
+			branchNode := NewBranchNode(branchNodePath)
+
+			newLeafNodePath := make([]byte, len(leaf.Path[matched+1:]))
+			copy(newLeafNodePath, leaf.Path[matched+1:])
+
+			branchNode.SetBranch(
+				leaf.Path[matched], NewLeafNode(newLeafNodePath, leaf.Value))
+
+			branchNode.SetBranch(
+				keyNibbles[matched], NewLeafNode(keyNibbles[matched+1:], value))
+
+			t.root = branchNode
+			return nil
+		}
+	}
 }
 
 func NewTrie() *Trie {
